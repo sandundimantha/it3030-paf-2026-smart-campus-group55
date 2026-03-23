@@ -12,6 +12,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
+import java.io.IOException;
 
 import java.util.List;
 import java.util.Map;
@@ -85,5 +88,14 @@ public class TicketController {
         User user = userRepository.findByEmail(email).orElseThrow();
         commentService.deleteComment(commentId, user);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Ticket uploadAttachments(@AuthenticationPrincipal Jwt jwt, 
+                                    @PathVariable Long id, 
+                                    @RequestParam("files") List<MultipartFile> files) throws IOException {
+        String email = jwt.getClaimAsString("email");
+        User user = userRepository.findByEmail(email).orElseThrow();
+        return ticketService.uploadAttachments(id, files, user);
     }
 }
