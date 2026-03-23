@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axiosConfig';
 import TicketForm from '../components/TicketForm';
+import TicketDetailModal from '../components/TicketDetailModal';
 
 export default function TicketsPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
   const fetchTickets = async () => {
     try {
@@ -91,7 +93,9 @@ export default function TicketsPage() {
                   <p className="text-sm font-bold text-gray-900">{ticket.reportedBy?.name || 'Unknown'}</p>
                 </div>
                 
-                <button className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors mt-2">
+                <button
+                  onClick={() => setSelectedTicket(ticket)}
+                  className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors mt-2">
                   View Details →
                 </button>
               </div>
@@ -105,6 +109,17 @@ export default function TicketsPage() {
         <TicketForm 
           onClose={() => setIsFormOpen(false)} 
           onTicketCreated={fetchTickets} 
+        />
+      )}
+
+      {selectedTicket && (
+        <TicketDetailModal
+          ticket={selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+          onUpdated={() => {
+            setSelectedTicket(null);
+            fetchTickets();
+          }}
         />
       )}
     </div>

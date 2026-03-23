@@ -1,13 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import api from '../api/axiosConfig';
 
 export default function Navigation() {
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const user = (() => {
     try { return JSON.parse(localStorage.getItem('user')); }
     catch { return null; }
   })();
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const res = await api.get('/notifications');
+        setUnreadCount(res.data.filter(n => !n.read).length);
+      } catch (err) {
+        // silently fail — notifications badge is non-critical
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000); // poll every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -44,10 +60,25 @@ export default function Navigation() {
           <span className="mr-3 text-lg">🏢</span>
           <span className="font-semibold text-sm">Facilities</span>
         </NavLink>
+
+        <NavLink to="/bookings" className={linkClasses}>
+          <span className="mr-3 text-lg">📅</span>
+          <span className="font-semibold text-sm">Bookings</span>
+        </NavLink>
         
         <NavLink to="/tickets" className={linkClasses}>
           <span className="mr-3 text-lg">🎫</span>
           <span className="font-semibold text-sm">Tickets</span>
+        </NavLink>
+
+        <NavLink to="/notifications" className={linkClasses}>
+          <span className="mr-3 text-lg">🔔</span>
+          <span className="font-semibold text-sm flex-1">Notifications</span>
+          {unreadCount > 0 && (
+            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </NavLink>
       </div>
 

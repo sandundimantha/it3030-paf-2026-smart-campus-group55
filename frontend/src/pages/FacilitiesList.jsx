@@ -1,26 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axiosConfig';
+import BookingModal from '../components/BookingModal';
+import ResourceFormModal from '../components/ResourceFormModal';
 
 export default function FacilitiesList() {
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [bookingResource, setBookingResource] = useState(null);
+  const [editResource, setEditResource] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
-  useEffect(() => {
-    // Fetch facilities from the Spring Boot API
-    const fetchFacilities = async () => {
-      try {
-        const response = await api.get('/resources');
-        setFacilities(response.data);
-      } catch (error) {
-        console.error("Failed to load facilities", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchFacilities();
-  }, []);
+  const user = (() => {
+    try { return JSON.parse(localStorage.getItem('user')); }
+    catch { return null; }
+  })();
+  const isAdmin = user?.role === 'ADMIN';
+
+  const fetchFacilities = async () => {
+    try {
+      const response = await api.get('/resources');
+      setFacilities(response.data);
+    } catch (error) {
+      console.error("Failed to load facilities", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchFacilities(); }, []);
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/resources/${id}`);
+      fetchFacilities();
+    } catch (error) {
+      alert('Failed to delete. The resource may have active bookings.');
+    }
+  };
 
   return (
     <div className="animate-fade-in-up">
@@ -29,9 +47,20 @@ export default function FacilitiesList() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Facilities & Assets Catalogue</h1>
           <p className="text-gray-500">Browse and book available campus resources in real-time.</p>
         </div>
-        <button className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 shadow-brand-500/30">
-          + Request Booking
-        </button>
+        <div className="flex gap-3">
+          {isAdmin && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-medium rounded-xl transition-all shadow-sm">
+              + Add Resource
+            </button>
+          )}
+          <button
+            onClick={() => setBookingResource({ id: null })}
+            className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 shadow-brand-500/30">
+            📅 Request Booking
+          </button>
+        </div>
       </header>
       
       <div className="mb-6 relative">
@@ -65,30 +94,76 @@ export default function FacilitiesList() {
               (f.type && f.type.toLowerCase().includes(search.toLowerCase()))
             )
             .map((fac) => (
-            <FacilityCard key={fac.id} facility={fac} />
+            <FacilityCard
+              key={fac.id}
+              facility={fac}
+              isAdmin={isAdmin}
+              onBook={() => setBookingResource(fac)}
+              onEdit={() => setEditResource(fac)}
+              onDelete={() => handleDelete(fac.id, fac.name)}
+            />
           ))}
         </div>
+      )}
+
+      {/* Booking Modal */}
+      {bookingResource && (
+        <BookingModal
+          resource={bookingResource}
+          onClose={() => setBookingResource(null)}
+          onBooked={fetchFacilities}
+        />
+      )}
+
+      {/* Admin: Add Resource Modal */}
+      {showAddForm && (
+        <ResourceFormModal
+          onClose={() => setShowAddForm(false)}
+          onSaved={fetchFacilities}
+        />
+      )}
+
+      {/* Admin: Edit Resource Modal */}
+      {editResource && (
+        <ResourceFormModal
+          resource={editResource}
+          onClose={() => setEditResource(null)}
+          onSaved={fetchFacilities}
+        />
       )}
     </div>
   );
 }
 
-function FacilityCard({ facility }) {
+function FacilityCard({ facility, isAdmin, onBook, onEdit, onDelete }) {
   const isAvailable = facility.status === 'ACTIVE';
   
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
       <div className="h-40 bg-gray-100 relative overflow-hidden flex items-center justify-center">
-        {/* Fallback pattern background if no image exists */}
         <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
         <span className="text-5xl opacity-40 group-hover:scale-110 transition-transform duration-300">
-          {facility.type === 'LAB' ? '🧪' : facility.type === 'LECTURE_HALL' ? '🏛️' : '💻'}
+          {facility.type === 'LAB' ? '🧪' : facility.type === 'LECTURE_HALL' ? '🏛️' : facility.type === 'EQUIPMENT' ? '⚙️' : '💻'}
         </span>
         <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold shadow-sm ${
           isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
         }`}>
           {facility.status}
         </span>
+
+        {/* Admin controls */}
+        {isAdmin && (
+          <div className="absolute top-3 left-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={onEdit}
+              className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-sm shadow-sm hover:bg-white transition-colors" title="Edit">
+              ✏️
+            </button>
+            <button onClick={onDelete}
+              className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-lg flex items-center justify-center text-sm shadow-sm hover:bg-red-50 transition-colors" title="Delete">
+              🗑️
+            </button>
+          </div>
+        )}
       </div>
       
       <div className="p-5 flex-1 flex flex-col">
@@ -110,17 +185,24 @@ function FacilityCard({ facility }) {
              <span className="mr-2 opacity-70">👥</span> 
              <span className="font-medium">Capacity: {facility.capacity || 'N/A'}</span>
            </div>
+           {facility.availabilityWindows && (
+             <div className="flex items-center text-sm text-gray-600">
+               <span className="mr-2 opacity-70">🕐</span>
+               <span className="font-medium">{facility.availabilityWindows}</span>
+             </div>
+           )}
         </div>
         
         <button 
+          onClick={onBook}
           disabled={!isAvailable}
           className={`w-full py-2.5 rounded-xl font-semibold transition-all duration-200 mt-auto ${
             isAvailable 
               ? 'bg-gray-50 text-brand-600 hover:bg-brand-50 border border-gray-100' 
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed hidden'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           }`}
         >
-          Book Now
+          {isAvailable ? 'Book Now' : 'Out of Service'}
         </button>
       </div>
     </div>
